@@ -69,15 +69,33 @@ public class RulerView extends View {
         Rect drawingRect = new Rect();
         getDrawingRect(drawingRect);
         float lineStartY = drawingRect.bottom;
+        float hashMarkHeight;
         ArrayList<Float> floats = new ArrayList<>();
 
         while (lineStartY > 0) {
-            floats.add((float) 0);
-            floats.add(lineStartY);
-            floats.add(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 50, mDisplayMetrics));
-            floats.add(lineStartY);
+            for (int i = 0; i < 16; i++) {
 
-            lineStartY -= mDisplayMetrics.ydpi;
+                double division = i / 16.0;
+                if (i == 0)
+                    hashMarkHeight = 50;
+                else if (division % .5 == 0)
+                    hashMarkHeight = 40;
+                else if (division % .25 == 0)
+                    hashMarkHeight = 30;
+                else if (division % .125 == 0)
+                    hashMarkHeight = 20;
+                else if (division % .0625 == 0)
+                    hashMarkHeight = 10;
+                else
+                    hashMarkHeight = 0;
+
+                floats.add((float) 0);
+                floats.add(lineStartY);
+                floats.add(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, hashMarkHeight, mDisplayMetrics));
+                floats.add(lineStartY);
+
+                lineStartY -= mDisplayMetrics.ydpi / 16;
+            }
         }
         mLines = Floats.toArray(floats);
     }
