@@ -5,12 +5,17 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.os.Build;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.WindowManager;
+
+import com.google.common.primitives.Floats;
+
+import java.util.ArrayList;
 
 /**
  * Created by M. Silva on 5/9/16.
@@ -55,19 +60,26 @@ public class RulerView extends View {
         mTextPaint.setColor(Color.BLACK);
         mTextPaint.setTextSize(12);
 
+    }
 
-        float lineStartY = 0;
-        float lines = mDisplayMetrics.heightPixels / mDisplayMetrics.ydpi;
-        mLines = new float[(int) lines * 4];
-        for (int i = 0; (i + 4) <= mLines.length; i += 4) {
-            mLines[i] = 0;
-            mLines[i + 2] = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 50, mDisplayMetrics);
-            mLines[i + 1] = lineStartY;
-            mLines[i + 3] = lineStartY;
+    @Override
+    protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+        super.onSizeChanged(w, h, oldw, oldh);
 
-            lineStartY += mDisplayMetrics.ydpi;
+        Rect drawingRect = new Rect();
+        getDrawingRect(drawingRect);
+        float lineStartY = drawingRect.bottom;
+        ArrayList<Float> floats = new ArrayList<>();
+
+        while (lineStartY > 0) {
+            floats.add((float) 0);
+            floats.add(lineStartY);
+            floats.add(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 50, mDisplayMetrics));
+            floats.add(lineStartY);
+
+            lineStartY -= mDisplayMetrics.ydpi;
         }
-
+        mLines = Floats.toArray(floats);
     }
 
     @Override
