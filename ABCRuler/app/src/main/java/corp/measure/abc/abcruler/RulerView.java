@@ -30,6 +30,7 @@ public class RulerView extends View {
     private Paint mTextPaint;
     private DisplayMetrics mDisplayMetrics;
     private TickMark[] mTickMarks;
+    private boolean mDisplayAllMarks = false;
 
     public RulerView(Context context) {
         super(context);
@@ -50,6 +51,14 @@ public class RulerView extends View {
     public RulerView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
         init(context);
+    }
+
+    public void setDisplayAllMarks(boolean displayAllMarks) {
+        // Set only if value changes and when it does, update the UI
+        if (displayAllMarks != mDisplayAllMarks) {
+            mDisplayAllMarks = displayAllMarks;
+            invalidate();
+        }
     }
 
     private void init(Context context) {
@@ -179,12 +188,10 @@ public class RulerView extends View {
                 return rank / 8 + "/" + 2;
             } else if (subdivision == QUARTER) {
                 return rank / 4 + "/" + 4;
-            } else if (subdivision == EIGHTH) { // Remaining are omitted for visual clarity
-//                return rank / 2 + "/" + 8;
-                return "";
+            } else if (subdivision == EIGHTH) {
+                return rank / 2 + "/" + 8;
             } else if (subdivision == SIXTEENTH) {
-//                return rank + "/" + 16;
-                return "";
+                return rank + "/" + 16;
             } else {
                 return "";
             }
@@ -197,7 +204,18 @@ public class RulerView extends View {
         for (TickMark tickMark : mTickMarks) {
             canvas.drawLines(tickMark.points, mLinePaint);
             mTextPaint.setTextSize(tickMark.textSize);
-            canvas.drawText(tickMark.label, tickMark.labelPosition.x, tickMark.labelPosition.y, mTextPaint);
+
+            boolean isDetailMark =
+                    tickMark.subdivision == EIGHTH || tickMark.subdivision == SIXTEENTH;
+
+            if (mDisplayAllMarks || !isDetailMark) {
+                canvas.drawText(
+                        tickMark.label,
+                        tickMark.labelPosition.x,
+                        tickMark.labelPosition.y,
+                        mTextPaint
+                );
+            }
         }
     }
 

@@ -7,6 +7,7 @@
     tools:context="corp.measure.abc.abcruler.MeasureActivity">
 
     <corp.measure.abc.abcruler.RulerView
+        android:id="@+id/ruler_view"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
 </RelativeLayout>

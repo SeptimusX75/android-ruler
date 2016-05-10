@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">ABC Ruler</string>
+    <string name="enable_detail_ticks">Enable detail ticks</string>
 </resources>
