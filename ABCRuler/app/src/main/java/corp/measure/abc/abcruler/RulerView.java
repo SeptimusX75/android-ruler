@@ -7,6 +7,7 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.os.Build;
+import android.support.annotation.NonNull;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
@@ -21,6 +22,11 @@ import java.util.ArrayList;
  * Created by M. Silva on 5/9/16.
  */
 public class RulerView extends View {
+    public static final double HALF = .5;
+    public static final double QUARTER = .25;
+    public static final double EIGHT = .125;
+    public static final double SIXTEENTH = .0625;
+    public static final int WHOLE = 0;
     private Paint mLinePaint;
     private Paint mTextPaint;
     private DisplayMetrics mDisplayMetrics;
@@ -59,45 +65,66 @@ public class RulerView extends View {
         mTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         mTextPaint.setColor(Color.BLACK);
         mTextPaint.setTextSize(12);
-
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
 
+        // Find the max of the view
         Rect drawingRect = new Rect();
         getDrawingRect(drawingRect);
-        float lineStartY = drawingRect.bottom;
-        float hashMarkHeight;
-        ArrayList<Float> floats = new ArrayList<>();
+        float markPositionY = drawingRect.bottom;
 
-        while (lineStartY > 0) {
+        // Copy into array
+        mLines = generateMarksFromMaxPosition(markPositionY);
+    }
+
+    @NonNull
+    private float[] generateMarksFromMaxPosition(float markPosition) {
+
+        ArrayList<Float> floats = new ArrayList<>();
+        float markHeight;
+
+        // Iterate while marks can still be rendered within view
+        while (markPosition > 0) {
+
+            // Subdivide marks into 1/16" increments
             for (int i = 0; i < 16; i++) {
 
-                double division = i / 16.0;
-                if (i == 0)
-                    hashMarkHeight = 50;
-                else if (division % .5 == 0)
-                    hashMarkHeight = 40;
-                else if (division % .25 == 0)
-                    hashMarkHeight = 30;
-                else if (division % .125 == 0)
-                    hashMarkHeight = 20;
-                else if (division % .0625 == 0)
-                    hashMarkHeight = 10;
-                else
-                    hashMarkHeight = 0;
+                double subdivision = i / 16.0; // Current mark for the current inch
+                markHeight = getMarkHeightDp(subdivision);
 
-                floats.add((float) 0);
-                floats.add(lineStartY);
-                floats.add(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, hashMarkHeight, mDisplayMetrics));
-                floats.add(lineStartY);
+                floats.add((float) 0); // X0
+                floats.add(markPosition); // Y0
+                floats.add(convertDpToSp(markHeight)); // X1, Height of marks
+                floats.add(markPosition); // Y1
 
-                lineStartY -= mDisplayMetrics.ydpi / 16;
+                // decrement size of 1/16" from the total available rendering space for each mark
+                markPosition -= mDisplayMetrics.ydpi / 16;
             }
         }
-        mLines = Floats.toArray(floats);
+        return Floats.toArray(floats);
+    }
+
+    private float convertDpToSp(float dp) {
+        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, mDisplayMetrics);
+    }
+
+    private float getMarkHeightDp(double subdivision) {
+        if (subdivision == WHOLE) {
+            return 50;
+        } else if (subdivision % HALF == 0) {
+            return 40;
+        } else if (subdivision % QUARTER == 0) {
+            return 30;
+        } else if (subdivision % EIGHT == 0) {
+            return 20;
+        } else if (subdivision % SIXTEENTH == 0) {
+            return 10;
+        } else {
+            return 0;
+        }
     }
 
     @Override
