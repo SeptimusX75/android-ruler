@@ -28,10 +28,10 @@ public class MeasureActivity extends AppCompatActivity {
             case R.id.toggle_detail_ticks:
                 if (item.isChecked()) {
                     item.setChecked(false);
-                    mRulerView.setDisplayAllMarks(false);
+                    mRulerView.setDisplayAllLabels(false);
                 } else {
                     item.setChecked(true);
-                    mRulerView.setDisplayAllMarks(true);
+                    mRulerView.setDisplayAllLabels(true);
                 }
                 return true;
             default:

@@ -20,6 +20,7 @@ import java.util.Locale;
 
 /**
  * Created by M. Silva on 5/9/16.
+ * Custom {@linkplain View} that renders a fairly accurate ruler within the designated bounds
  */
 public class RulerView extends View {
     public static final int WHOLE = 0;
@@ -27,17 +28,22 @@ public class RulerView extends View {
     public static final double QUARTER = .25;
     public static final double EIGHTH = .125;
     public static final double SIXTEENTH = .0625;
+
+    // TODO: 5/10/16 make these configurable
     public static final int TEXT_SIZE = 8;
     public static final double TICKS_IN_AN_INCH = 16.0;
+    public static final int CENTER_TEXT_SIZE = 40;
+    public static final int TICK_TEXT_PADDING = 12;
+    private boolean mDisplayAllLabels = false;
+
     private float mTouchLinePos = 0;
     private Paint mLinePaint;
     private Paint mTouchLinePaint;
     private Paint mTextPaint;
-    private DisplayMetrics mDisplayMetrics;
-    private TickMark[] mTickMarks;
-    private boolean mDisplayAllMarks = false;
-    private Rect mDrawingRect;
     private Paint mCenterTextPaint;
+    private DisplayMetrics mDisplayMetrics;
+    private Rect mDrawingRect;
+    private TickMark[] mTickMarks;
 
     public RulerView(Context context) {
         super(context);
@@ -60,15 +66,21 @@ public class RulerView extends View {
         init(context);
     }
 
-    public void setDisplayAllMarks(boolean displayAllMarks) {
+    /**
+     * Sets and renders more granular labels on marks
+     *
+     * @param displayAllLabels true to render all labels down to 1/16th of 1"
+     */
+    public void setDisplayAllLabels(boolean displayAllLabels) {
         // Set only if value changes and when it does, update the UI
-        if (displayAllMarks != mDisplayAllMarks) {
-            mDisplayAllMarks = displayAllMarks;
+        if (displayAllLabels != mDisplayAllLabels) {
+            mDisplayAllLabels = displayAllLabels;
             invalidate();
         }
     }
 
     private void init(Context context) {
+        // Retrieve the phone metrics
         mDisplayMetrics = new DisplayMetrics();
         WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
         windowManager.getDefaultDisplay().getMetrics(mDisplayMetrics);
@@ -88,7 +100,7 @@ public class RulerView extends View {
 
         mCenterTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         mCenterTextPaint.setColor(Color.BLACK);
-        mCenterTextPaint.setTextSize(convertSpToPx(40));
+        mCenterTextPaint.setTextSize(convertSpToPx(CENTER_TEXT_SIZE));
         mCenterTextPaint.setTextAlign(Paint.Align.CENTER);
     }
 
@@ -103,6 +115,12 @@ public class RulerView extends View {
         mTickMarks = generateTickMarksFromMaxPosition(mDrawingRect.right);
     }
 
+    /**
+     * Generates tick mark objects containing information to render them in the designated bounds
+     *
+     * @param maxPosition the maximum x boundary of the view
+     * @return all tick marks that can be rendered on the screen
+     */
     @NonNull
     private TickMark[] generateTickMarksFromMaxPosition(float maxPosition) {
         float currentMarkPos = 0;
@@ -111,12 +129,12 @@ public class RulerView extends View {
         for (int i = 0; i < tickMarks.length; i++) {
             TickMark tickMark = new TickMark();
 
-            tickMark.rank = (int) (i % TICKS_IN_AN_INCH);
+            tickMark.numerator = (int) (i % TICKS_IN_AN_INCH);
             tickMark.value = i / TICKS_IN_AN_INCH;
-            tickMark.subdivision = getSubdivisionFromRank(tickMark.rank);
+            tickMark.subdivision = getSubdivisionFromNumerator(tickMark.numerator);
 
             tickMark.height = convertDpToPx(getTickHeightFromSubdivision(tickMark.subdivision));
-            float labelPos = tickMark.height + convertDpToPx(12);
+            float labelPos = tickMark.height + convertDpToPx(TICK_TEXT_PADDING);
 
             tickMark.points[0] = currentMarkPos;
             tickMark.points[1] = 0;
@@ -142,9 +160,15 @@ public class RulerView extends View {
         return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, mDisplayMetrics);
     }
 
-    private double getSubdivisionFromRank(int rank) {
-        double value = rank / 16.0;
-        if (rank == 0) {
+    /**
+     * The fractional classification for the numerator of a tick mark.
+     *
+     * @param numerator of the tick within the inch
+     * @return the fractional classification
+     */
+    private double getSubdivisionFromNumerator(int numerator) {
+        double value = numerator / TICKS_IN_AN_INCH;
+        if (numerator == 0) {
             return WHOLE;
         } else if (value % HALF == 0) {
             return HALF;
@@ -159,6 +183,12 @@ public class RulerView extends View {
         }
     }
 
+    /**
+     * Gets the height of a tick in DP based on the fractional classification
+     *
+     * @param subdivision the fractional classification
+     * @return the tick height in DP
+     */
     private float getTickHeightFromSubdivision(double subdivision) {
         if (subdivision == WHOLE) {
             return 50;
@@ -175,6 +205,12 @@ public class RulerView extends View {
         }
     }
 
+    /**
+     * These are hard coded and could possibly be configurable later
+     *
+     * @param subdivision the fractional classification
+     * @return text size in SP
+     */
     private float getTextSizeFromSubdivision(double subdivision) {
         if (subdivision == WHOLE) {
             return 12;
@@ -191,23 +227,29 @@ public class RulerView extends View {
         }
     }
 
+    /**
+     * Gets the tick label using the tick numerator
+     *
+     * @param tickMark The tickmark requiring a textual label
+     * @return The appropriate label for the tick's position
+     */
     private String getTickLabel(TickMark tickMark) {
-        int rank = tickMark.rank;
+        int numerator = tickMark.numerator;
 
-        if (rank == 0) {
+        if (numerator == 0) {
             return String.valueOf(((int) tickMark.value));
         } else {
             double subdivision = tickMark.subdivision;
-            // Return values are the rank divided by the GCD
-            // i.e. 8/16 returns rank 8 divided by 8 over 2
+            // Return values are the numerator divided by the GCD
+            // i.e. 8/16 returns numerator 8 divided by 8 over 2
             if (subdivision == HALF) {
-                return rank / 8 + "/" + 2;
+                return numerator / 8 + "/" + 2;
             } else if (subdivision == QUARTER) {
-                return rank / 4 + "/" + 4;
+                return numerator / 4 + "/" + 4;
             } else if (subdivision == EIGHTH) {
-                return rank / 2 + "/" + 8;
+                return numerator / 2 + "/" + 8;
             } else if (subdivision == SIXTEENTH) {
-                return rank + "/" + 16;
+                return numerator + "/" + 16;
             } else {
                 return "";
             }
@@ -217,10 +259,10 @@ public class RulerView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        // Vertical Measurement Line
+        // Draw the vertical measurement line for touch feedback
         canvas.drawLine(mTouchLinePos, 0, mTouchLinePos, mDrawingRect.bottom, mTouchLinePaint);
 
-        // Measurement Value rounded to 2 decimal places
+        // Render the measurement value rounded to 2 decimal places
         canvas.drawText(
                 String.format(Locale.getDefault(), "%.2f", (mTouchLinePos / mDisplayMetrics.xdpi)) + " in.",
                 mDrawingRect.right / 2,
@@ -228,14 +270,16 @@ public class RulerView extends View {
                 mCenterTextPaint
         );
 
+        // Render the tick marks
         for (TickMark tickMark : mTickMarks) {
             canvas.drawLines(tickMark.points, mLinePaint);
+            //Use the same paint object for all ticks but re-size on a per-tick basis
             mTextPaint.setTextSize(tickMark.textSize);
 
             boolean isDetailMark =
                     tickMark.subdivision == EIGHTH || tickMark.subdivision == SIXTEENTH;
 
-            if (mDisplayAllMarks || !isDetailMark) {
+            if (mDisplayAllLabels || !isDetailMark) {
                 canvas.drawText(
                         tickMark.label,
                         tickMark.labelPosition.x,
@@ -268,9 +312,12 @@ public class RulerView extends View {
         return true;
     }
 
+    /**
+     * Convenience class for storing tick mark state
+     */
     private static class TickMark {
         float[] points = new float[4];
-        int rank;
+        int numerator;
         double value;
         double subdivision;
         String label;
