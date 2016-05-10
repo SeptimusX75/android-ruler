@@ -5,6 +5,7 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.Build;
 import android.support.annotation.NonNull;
@@ -14,10 +15,6 @@ import android.util.TypedValue;
 import android.view.View;
 import android.view.WindowManager;
 
-import com.google.common.primitives.Floats;
-
-import java.util.ArrayList;
-
 /**
  * Created by M. Silva on 5/9/16.
  */
@@ -25,15 +22,14 @@ public class RulerView extends View {
     public static final int WHOLE = 0;
     public static final double HALF = .5;
     public static final double QUARTER = .25;
-    public static final double EIGHT = .125;
+    public static final double EIGHTH = .125;
     public static final double SIXTEENTH = .0625;
     public static final int TEXT_SIZE = 8;
-    public static final int TEXT_OFFSET = TEXT_SIZE / 4;
+    public static final double TICKS_IN_AN_INCH = 16.0;
     private Paint mLinePaint;
     private Paint mTextPaint;
     private DisplayMetrics mDisplayMetrics;
-    private float[] mLines;
-    private boolean isLandscape;
+    private TickMark[] mTickMarks;
 
     public RulerView(Context context) {
         super(context);
@@ -74,132 +70,145 @@ public class RulerView extends View {
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
-        isLandscape = w > h;
         // Find the max of the view
         Rect drawingRect = new Rect();
         getDrawingRect(drawingRect);
 
         // Copy into array
-        mLines = isLandscape ?
-                generateMarksFromMinPosition(drawingRect.right) :
-                generateMarksFromMaxPosition(drawingRect.bottom);
+        mTickMarks = generateTickMarksFromMaxPosition(drawingRect.right);
     }
 
     @NonNull
-    private float[] generateMarksFromMinPosition(float maxPosition) {
+    private TickMark[] generateTickMarksFromMaxPosition(float maxPosition) {
+        float currentMarkPos = 0;
+        TickMark[] tickMarks = new TickMark[(int) (maxPosition / TICKS_IN_AN_INCH)];
 
-        ArrayList<Float> floats = new ArrayList<>();
-        float markHeight;
-        float markPosition = 0;
-        // Iterate while marks can still be rendered within view
-        while (markPosition < maxPosition) {
+        for (int i = 0; i < tickMarks.length; i++) {
+            TickMark tickMark = new TickMark();
 
-            // Subdivide marks into 1/16" increments
-            for (int i = 0; i < 16; i++) {
+            tickMark.rank = (int) (i % TICKS_IN_AN_INCH);
+            tickMark.value = i / TICKS_IN_AN_INCH;
+            tickMark.subdivision = getSubdivisionFromRank(tickMark.rank);
 
-                double subdivision = i / 16.0; // Current mark for the current inch
-                markHeight = getMarkHeightDp(subdivision);
+            tickMark.height = convertDpToPx(getTickHeightFromSubdivision(tickMark.subdivision));
+            float labelPos = tickMark.height + convertDpToPx(12);
 
-                floats.add(markPosition); // X0
-                floats.add((float) 0); // Y0
-                floats.add(markPosition); // X1
-                floats.add(convertDpToPx(markHeight)); // Y1
+            tickMark.points[0] = currentMarkPos;
+            tickMark.points[1] = 0;
+            tickMark.points[2] = currentMarkPos;
+            tickMark.points[3] = tickMark.height;
 
-                // decrement size of 1/16" from the total available rendering space for each mark
-                markPosition += mDisplayMetrics.xdpi / 16;
-            }
+            tickMark.label = getTickLabel(tickMark);
+            tickMark.labelPosition = new Point((int) currentMarkPos, (int) labelPos);
+            tickMark.textSize = convertSpToPx(getTextSizeFromSubdivision(tickMark.subdivision));
+
+            tickMarks[i] = tickMark;
+            currentMarkPos += mDisplayMetrics.xdpi / TICKS_IN_AN_INCH;
         }
-        return Floats.toArray(floats);
-    }
 
-    @NonNull
-    private float[] generateMarksFromMaxPosition(float markPosition) {
-
-        ArrayList<Float> floats = new ArrayList<>();
-        float markHeight;
-
-        // Iterate while marks can still be rendered within view
-        while (markPosition > 0) {
-
-            // Subdivide marks into 1/16" increments
-            for (int i = 0; i < 16; i++) {
-
-                double subdivision = i / 16.0; // Current mark for the current inch
-                markHeight = getMarkHeightDp(subdivision);
-
-                floats.add((float) 0); // X0
-                floats.add(markPosition); // Y0
-                floats.add(convertDpToPx(markHeight)); // X1, Height of marks
-                floats.add(markPosition); // Y1
-
-                // decrement size of 1/16" from the total available rendering space for each mark
-                markPosition -= mDisplayMetrics.ydpi / 16;
-            }
-        }
-        return Floats.toArray(floats);
+        return tickMarks;
     }
 
     private float convertDpToPx(float dp) {
         return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, mDisplayMetrics);
     }
 
-    private float convertSpToPx(float Sp) {
-        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, Sp, mDisplayMetrics);
+    private float convertSpToPx(float sp) {
+        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, sp, mDisplayMetrics);
     }
 
-    private float getMarkHeightDp(double subdivision) {
+    private double getSubdivisionFromRank(int rank) {
+        double value = rank / 16.0;
+        if (rank == 0) {
+            return WHOLE;
+        } else if (value % HALF == 0) {
+            return HALF;
+        } else if (value % QUARTER == 0) {
+            return QUARTER;
+        } else if (value % EIGHTH == 0) {
+            return EIGHTH;
+        } else if (value % SIXTEENTH == 0) {
+            return SIXTEENTH;
+        } else {
+            return WHOLE;
+        }
+    }
+
+    private float getTickHeightFromSubdivision(double subdivision) {
         if (subdivision == WHOLE) {
             return 50;
-        } else if (subdivision % HALF == 0) {
+        } else if (subdivision == HALF) {
             return 40;
-        } else if (subdivision % QUARTER == 0) {
+        } else if (subdivision == QUARTER) {
             return 30;
-        } else if (subdivision % EIGHT == 0) {
+        } else if (subdivision == EIGHTH) {
             return 20;
-        } else if (subdivision % SIXTEENTH == 0) {
+        } else if (subdivision == SIXTEENTH) {
             return 10;
         } else {
             return 0;
         }
     }
 
-    private String getMarkLabel(int mark, double subdivision) {
-        if (subdivision % 1 == 0) {
-            return String.valueOf(((int) subdivision));
-        } else if (subdivision % HALF == 0) {
-            return mark / 8 + "/" + 2;
-        } else if (subdivision % QUARTER == 0) {
-            return mark / 4 + "/" + 4;
-        } else if (subdivision % EIGHT == 0) {
-            return "";
-        } else if (subdivision % SIXTEENTH == 0) {
-            return "";
+    private float getTextSizeFromSubdivision(double subdivision) {
+        if (subdivision == WHOLE) {
+            return 12;
+        } else if (subdivision == HALF) {
+            return 10;
+        } else if (subdivision == QUARTER) {
+            return 8;
+        } else if (subdivision == EIGHTH) {
+            return 6;
+        } else if (subdivision == SIXTEENTH) {
+            return 4;
         } else {
-            return "";
+            return 0;
+        }
+    }
+
+    private String getTickLabel(TickMark tickMark) {
+        int rank = tickMark.rank;
+
+        if (rank == 0) {
+            return String.valueOf(((int) tickMark.value));
+        } else {
+            double subdivision = tickMark.subdivision;
+            // Return values are the rank divided by the GCD
+            // i.e. 8/16 returns rank 8 divided by 8 over 2
+            if (subdivision == HALF) {
+                return rank / 8 + "/" + 2;
+            } else if (subdivision == QUARTER) {
+                return rank / 4 + "/" + 4;
+            } else if (subdivision == EIGHTH) { // Remaining are omitted for visual clarity
+//                return rank / 2 + "/" + 8;
+                return "";
+            } else if (subdivision == SIXTEENTH) {
+//                return rank + "/" + 16;
+                return "";
+            } else {
+                return "";
+            }
         }
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        canvas.drawLines(mLines, mLinePaint);
-
-        int mark = 0;
-        float subdivision;
-
-        for (int i = 4; i + 3 < mLines.length; i++) { // Iterate all x,y values
-            if (i % 4 == 0) {
-                mark++;
-
-                subdivision = (float) (mark / 16.0);
-                canvas.drawText(
-                        getMarkLabel(mark % 16, subdivision),
-                        mLines[i],
-                        mLines[i + 3] + convertSpToPx(10),
-                        mTextPaint
-                );
-
-            }
+        for (TickMark tickMark : mTickMarks) {
+            canvas.drawLines(tickMark.points, mLinePaint);
+            mTextPaint.setTextSize(tickMark.textSize);
+            canvas.drawText(tickMark.label, tickMark.labelPosition.x, tickMark.labelPosition.y, mTextPaint);
         }
+    }
+
+    private static class TickMark {
+        float[] points = new float[4];
+        int rank;
+        double value;
+        double subdivision;
+        String label;
+        Point labelPosition;
+        float height;
+        float textSize;
     }
 }
