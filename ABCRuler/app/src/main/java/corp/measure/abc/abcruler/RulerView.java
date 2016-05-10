@@ -12,8 +12,11 @@ import android.support.annotation.NonNull;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.util.TypedValue;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+
+import java.util.Locale;
 
 /**
  * Created by M. Silva on 5/9/16.
@@ -26,11 +29,15 @@ public class RulerView extends View {
     public static final double SIXTEENTH = .0625;
     public static final int TEXT_SIZE = 8;
     public static final double TICKS_IN_AN_INCH = 16.0;
+    private float mTouchLinePos = 0;
     private Paint mLinePaint;
+    private Paint mTouchLinePaint;
     private Paint mTextPaint;
     private DisplayMetrics mDisplayMetrics;
     private TickMark[] mTickMarks;
     private boolean mDisplayAllMarks = false;
+    private Rect mDrawingRect;
+    private Paint mCenterTextPaint;
 
     public RulerView(Context context) {
         super(context);
@@ -70,21 +77,30 @@ public class RulerView extends View {
         mLinePaint.setColor(Color.BLACK);
         mLinePaint.setStyle(Paint.Style.FILL_AND_STROKE);
 
+        mTouchLinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        mTouchLinePaint.setColor(Color.RED);
+        mTouchLinePaint.setStyle(Paint.Style.FILL_AND_STROKE);
+
         mTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         mTextPaint.setColor(Color.BLACK);
         mTextPaint.setTextSize(convertSpToPx(TEXT_SIZE));
         mTextPaint.setTextAlign(Paint.Align.CENTER);
+
+        mCenterTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        mCenterTextPaint.setColor(Color.BLACK);
+        mCenterTextPaint.setTextSize(convertSpToPx(40));
+        mCenterTextPaint.setTextAlign(Paint.Align.CENTER);
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         // Find the max of the view
-        Rect drawingRect = new Rect();
-        getDrawingRect(drawingRect);
+        mDrawingRect = new Rect();
+        getDrawingRect(mDrawingRect);
 
         // Copy into array
-        mTickMarks = generateTickMarksFromMaxPosition(drawingRect.right);
+        mTickMarks = generateTickMarksFromMaxPosition(mDrawingRect.right);
     }
 
     @NonNull
@@ -201,6 +217,17 @@ public class RulerView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
+        // Vertical Measurement Line
+        canvas.drawLine(mTouchLinePos, 0, mTouchLinePos, mDrawingRect.bottom, mTouchLinePaint);
+
+        // Measurement Value rounded to 2 decimal places
+        canvas.drawText(
+                String.format(Locale.getDefault(), "%.2f", (mTouchLinePos / mDisplayMetrics.xdpi)) + " in.",
+                mDrawingRect.right / 2,
+                mDrawingRect.bottom / 2,
+                mCenterTextPaint
+        );
+
         for (TickMark tickMark : mTickMarks) {
             canvas.drawLines(tickMark.points, mLinePaint);
             mTextPaint.setTextSize(tickMark.textSize);
@@ -217,6 +244,28 @@ public class RulerView extends View {
                 );
             }
         }
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        int eventAction = event.getAction();
+
+        float x = event.getX();
+
+        switch (eventAction) {
+            case MotionEvent.ACTION_DOWN:
+                mTouchLinePos = x;
+                break;
+            case MotionEvent.ACTION_UP:
+                break;
+            case MotionEvent.ACTION_MOVE:
+                mTouchLinePos = x;
+                break;
+        }
+
+        invalidate();
+
+        return true;
     }
 
     private static class TickMark {
