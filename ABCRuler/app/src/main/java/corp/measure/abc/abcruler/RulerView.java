@@ -5,13 +5,11 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.Build;
 import android.support.annotation.NonNull;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
-import android.util.SparseArray;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.WindowManager;
@@ -19,7 +17,6 @@ import android.view.WindowManager;
 import com.google.common.primitives.Floats;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 
 /**
  * Created by M. Silva on 5/9/16.
@@ -36,6 +33,7 @@ public class RulerView extends View {
     private Paint mTextPaint;
     private DisplayMetrics mDisplayMetrics;
     private float[] mLines;
+    private boolean isLandscape;
 
     public RulerView(Context context) {
         super(context);
@@ -70,19 +68,48 @@ public class RulerView extends View {
         mTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         mTextPaint.setColor(Color.BLACK);
         mTextPaint.setTextSize(convertSpToPx(TEXT_SIZE));
+        mTextPaint.setTextAlign(Paint.Align.CENTER);
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
-
+        isLandscape = w > h;
         // Find the max of the view
         Rect drawingRect = new Rect();
         getDrawingRect(drawingRect);
-        float markPositionY = drawingRect.bottom;
 
         // Copy into array
-        mLines = generateMarksFromMaxPosition(markPositionY);
+        mLines = isLandscape ?
+                generateMarksFromMinPosition(drawingRect.right) :
+                generateMarksFromMaxPosition(drawingRect.bottom);
+    }
+
+    @NonNull
+    private float[] generateMarksFromMinPosition(float maxPosition) {
+
+        ArrayList<Float> floats = new ArrayList<>();
+        float markHeight;
+        float markPosition = 0;
+        // Iterate while marks can still be rendered within view
+        while (markPosition < maxPosition) {
+
+            // Subdivide marks into 1/16" increments
+            for (int i = 0; i < 16; i++) {
+
+                double subdivision = i / 16.0; // Current mark for the current inch
+                markHeight = getMarkHeightDp(subdivision);
+
+                floats.add(markPosition); // X0
+                floats.add((float) 0); // Y0
+                floats.add(markPosition); // X1
+                floats.add(convertDpToPx(markHeight)); // Y1
+
+                // decrement size of 1/16" from the total available rendering space for each mark
+                markPosition += mDisplayMetrics.xdpi / 16;
+            }
+        }
+        return Floats.toArray(floats);
     }
 
     @NonNull
@@ -160,15 +187,15 @@ public class RulerView extends View {
         int mark = 0;
         float subdivision;
 
-        for (int k = 4; k + 3 < mLines.length; k++) { // Iterate all x,y values
-            if (k % 4 == 0) {
+        for (int i = 4; i + 3 < mLines.length; i++) { // Iterate all x,y values
+            if (i % 4 == 0) {
                 mark++;
 
                 subdivision = (float) (mark / 16.0);
                 canvas.drawText(
                         getMarkLabel(mark % 16, subdivision),
-                        mLines[k + 2] + convertSpToPx(TEXT_OFFSET),
-                        mLines[k + 3] + convertSpToPx(TEXT_OFFSET),
+                        mLines[i],
+                        mLines[i + 3] + convertSpToPx(10),
                         mTextPaint
                 );
 
