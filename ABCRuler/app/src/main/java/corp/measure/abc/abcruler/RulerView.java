@@ -5,11 +5,13 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.Build;
 import android.support.annotation.NonNull;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
+import android.util.SparseArray;
 import android.util.TypedValue;
 import android.view.View;
 import android.view.WindowManager;
@@ -17,16 +19,19 @@ import android.view.WindowManager;
 import com.google.common.primitives.Floats;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 
 /**
  * Created by M. Silva on 5/9/16.
  */
 public class RulerView extends View {
+    public static final int WHOLE = 0;
     public static final double HALF = .5;
     public static final double QUARTER = .25;
     public static final double EIGHT = .125;
     public static final double SIXTEENTH = .0625;
-    public static final int WHOLE = 0;
+    public static final int TEXT_SIZE = 8;
+    public static final int TEXT_OFFSET = TEXT_SIZE / 4;
     private Paint mLinePaint;
     private Paint mTextPaint;
     private DisplayMetrics mDisplayMetrics;
@@ -64,7 +69,7 @@ public class RulerView extends View {
 
         mTextPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
         mTextPaint.setColor(Color.BLACK);
-        mTextPaint.setTextSize(12);
+        mTextPaint.setTextSize(convertSpToPx(TEXT_SIZE));
     }
 
     @Override
@@ -97,7 +102,7 @@ public class RulerView extends View {
 
                 floats.add((float) 0); // X0
                 floats.add(markPosition); // Y0
-                floats.add(convertDpToSp(markHeight)); // X1, Height of marks
+                floats.add(convertDpToPx(markHeight)); // X1, Height of marks
                 floats.add(markPosition); // Y1
 
                 // decrement size of 1/16" from the total available rendering space for each mark
@@ -107,8 +112,12 @@ public class RulerView extends View {
         return Floats.toArray(floats);
     }
 
-    private float convertDpToSp(float dp) {
+    private float convertDpToPx(float dp) {
         return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, mDisplayMetrics);
+    }
+
+    private float convertSpToPx(float Sp) {
+        return TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, Sp, mDisplayMetrics);
     }
 
     private float getMarkHeightDp(double subdivision) {
@@ -127,9 +136,43 @@ public class RulerView extends View {
         }
     }
 
+    private String getMarkLabel(int mark, double subdivision) {
+        if (subdivision % 1 == 0) {
+            return String.valueOf(((int) subdivision));
+        } else if (subdivision % HALF == 0) {
+            return mark / 8 + "/" + 2;
+        } else if (subdivision % QUARTER == 0) {
+            return mark / 4 + "/" + 4;
+        } else if (subdivision % EIGHT == 0) {
+            return "";
+        } else if (subdivision % SIXTEENTH == 0) {
+            return "";
+        } else {
+            return "";
+        }
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
         canvas.drawLines(mLines, mLinePaint);
+
+        int mark = 0;
+        float subdivision;
+
+        for (int k = 4; k + 3 < mLines.length; k++) { // Iterate all x,y values
+            if (k % 4 == 0) {
+                mark++;
+
+                subdivision = (float) (mark / 16.0);
+                canvas.drawText(
+                        getMarkLabel(mark % 16, subdivision),
+                        mLines[k + 2] + convertSpToPx(TEXT_OFFSET),
+                        mLines[k + 3] + convertSpToPx(TEXT_OFFSET),
+                        mTextPaint
+                );
+
+            }
+        }
     }
 }
