@@ -14,6 +14,7 @@
 * Database configuration
 * How to run tests
 * Deployment instructions
+* Profit
 
 ### Contribution guidelines ###
 
