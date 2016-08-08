@@ -2,7 +2,6 @@
 
 ### What is this repository for? ###
 
-* Trying to get a gig coding Android at Tinder!
 * 0.1
 * [Learn Markdown](https://bitbucket.org/tutorials/markdowndemo)
 
